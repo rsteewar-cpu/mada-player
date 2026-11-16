@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mada Player</title>
+<style>
+:root{--bg:#F2F5F3;--ink:#12232A;--mute:#5B6F73;--line:#D3DEDA;--acc:#0E7C7B;--accink:#fff;--card:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0E1A1F;--ink:#E6EFEC;--mute:#8FA5A8;--line:#22363C;--acc:#3CC4BF;--accink:#06201F;--card:#15262C;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0E1A1F;--ink:#E6EFEC;--mute:#8FA5A8;--line:#22363C;--acc:#3CC4BF;--accink:#06201F;--card:#15262C;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,"Iowan Old Style",serif;min-height:100vh}
+main{max-width:560px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:28px;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 20px;font-size:14px}
+button,label.btn{font:inherit;cursor:pointer}
+.player{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
+.disc{width:120px;height:120px;border-radius:50%;margin:0 auto 14px;background:repeating-radial-gradient(circle,var(--ink) 0 2px,var(--bg) 2px 5px);border:1px solid var(--line);position:relative}
+.disc::after{content:"";position:absolute;inset:38px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 6px var(--card)}
+.disc.spin{animation:spin 6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.disc.spin{animation:none}}
+#title{text-align:center;font-size:18px;font-weight:700;min-height:28px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row{display:flex;align-items:center;gap:10px}
+.time{font:13px/1 system-ui,sans-serif;color:var(--mute);min-width:38px;font-variant-numeric:tabular-nums}
+input[type=range]{flex:1;accent-color:var(--acc);height:28px}
+.ctrl{display:flex;justify-content:center;align-items:center;gap:8px;margin:8px 0}
+.ib{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:17px}
+.ib.on{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.play{width:64px;height:64px;background:var(--acc);color:var(--accink);border:0;font-size:24px}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.vol{display:flex;align-items:center;gap:8px;font:13px system-ui,sans-serif;color:var(--mute)}
+.add{display:flex;gap:8px;margin:18px 0 8px}
+.btn{flex:1;text-align:center;padding:12px;border-radius:12px;border:1px solid var(--acc);color:var(--acc);font-weight:700;background:transparent}
+.btn.fill{background:var(--acc);color:var(--accink)}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+li.cur{color:var(--acc);font-weight:700}
+li span.n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+li button{border:0;background:transparent;color:var(--mute);font-size:18px;padding:6px 10px}
+.empty{color:var(--mute);text-align:center;padding:28px 8px;border:2px dashed var(--line);border-radius:14px}
+.empty.drag{border-color:var(--acc);color:var(--acc)}
+.priv{margin-top:22px;color:var(--mute);font:13px/1.5 system-ui,sans-serif;text-align:center}
+.sr{position:absolute;left:-9999px}
+</style>
+</head>
+<body>
+<main>
+<h1>Mada Player</h1>
+<p class="sub">Vos musiques, sur votre appareil. Gratuit, sans pub, sans compte.</p>
+
+<section class="player" aria-label="Lecteur">
+  <div class="disc" id="disc"></div>
+  <div id="title">Aucun titre</div>
+  <div class="row">
+    <span class="time" id="cur">0:00</span>
+    <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position">
+    <span class="time" id="dur" style="text-align:right">0:00</span>
+  </div>
+  <div class="ctrl">
+    <button class="ib" id="shuf" aria-label="Lecture aléatoire" aria-pressed="false">⤮</button>
+    <button class="ib" id="prev" aria-label="Précédent">⏮</button>
+    <button class="ib play" id="play" aria-label="Lecture">▶</button>
+    <button class="ib" id="next" aria-label="Suivant">⏭</button>
+    <button class="ib" id="rep" aria-label="Répéter" aria-pressed="false">↻</button>
+  </div>
+  <div class="vol"><span>Volume</span><input type="range" id="vol" min="0" max="100" value="80" aria-label="Volume"></div>
+</section>
+
+<div class="add">
+  <label class="btn fill" style="flex:1" for="files">Ajouter des fichiers</label>
+  </div>
+<input class="sr" type="file" id="files" accept="audio/*" multiple>
+
+<ul id="list"></ul>
+<div class="empty" id="empty">Ajoutez des fichiers audio (MP3, M4A, WAV, OGG, FLAC) ou déposez-les ici.</div>
+
+<p class="priv">Aucune donnée n’est envoyée : pas de statistiques, pas de rapports de plantage. Vos fichiers restent sur cet appareil et la liste est effacée à la fermeture de la page.</p>
+</main>
+
+<audio id="a" preload="metadata"></audio>
+<script>
+(function(){
+var a=document.getElementById('a'),$=function(i){return document.getElementById(i)};
+var tracks=[],idx=-1,shuffle=false,repeat=false;
+var EXT=/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|weba|webm)$/i;
+function fmt(s){if(!isFinite(s))return'0:00';s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function clean(n){return n.replace(/\.[^.]+$/,'').replace(/[_]+/g,' ')}
+function add(fl){
+  var n=0;
+  Array.prototype.forEach.call(fl,function(f){
+    if(!(f.type.indexOf('audio')===0||EXT.test(f.name)))return;
+    tracks.push({name:clean(f.name),url:URL.createObjectURL(f)});n++;
+  });
+  render();
+  if(n&&idx<0)load(tracks.length-n,false);
+}
+function render(){
+  var ul=$('list');ul.innerHTML='';
+  tracks.forEach(function(t,i){
+    var li=document.createElement('li');if(i===idx)li.className='cur';
+    var s=document.createElement('span');s.className='n';s.textContent=t.name;
+    var b=document.createElement('button');b.textContent='✕';b.setAttribute('aria-label','Retirer '+t.name);
+    b.onclick=function(e){e.stopPropagation();remove(i)};
+    li.onclick=function(){load(i,true)};
+    li.appendChild(s);li.appendChild(b);ul.appendChild(li);
+  });
+  $('empty').style.display=tracks.length?'none':'block';
+}
+function remove(i){
+  URL.revokeObjectURL(tracks[i].url);
+  var wasCur=i===idx;tracks.splice(i,1);
+  if(wasCur){a.pause();a.removeAttribute('src');idx=-1;setTitle('Aucun titre');if(tracks.length)load(Math.min(i,tracks.length-1),false)}
+  else if(i<idx)idx--;
+  render();
+}
+function setTitle(t){$('title').textContent=t;document.title=t==='Aucun titre'?'Mada Player':t+' – Mada Player'}
+function load(i,play){
+  idx=i;a.src=tracks[i].url;setTitle(tracks[i].name);render();
+  if('mediaSession' in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:tracks[i].name,artist:'Mada Player'})}catch(e){}}
+  if(play)a.play().catch(function(){});
+}
+function next(auto){
+  if(!tracks.length)return;
+  if(shuffle&&tracks.length>1){var r;do{r=Math.floor(Math.random()*tracks.length)}while(r===idx);return load(r,true)}
+  if(idx+1<tracks.length)return load(idx+1,true);
+  if(repeat||!auto)return load(0,true);
+  a.pause();
+}
+function prev(){
+  if(!tracks.length)return;
+  if(a.currentTime>3)a.currentTime=0;else load(idx>0?idx-1:tracks.length-1,true);
+}
+function toggle(){if(idx<0&&tracks.length)return load(0,true);if(a.paused)a.play().catch(function(){});else a.pause()}
+$('play').onclick=toggle;$('next').onclick=function(){next(false)};$('prev').onclick=prev;
+$('shuf').onclick=function(){shuffle=!shuffle;this.classList.toggle('on',shuffle);this.setAttribute('aria-pressed',shuffle)};
+$('rep').onclick=function(){repeat=!repeat;this.classList.toggle('on',repeat);this.setAttribute('aria-pressed',repeat)};
+$('vol').oninput=function(){a.volume=this.value/100};a.volume=.8;
+var seeking=false;
+$('seek').oninput=function(){seeking=true;if(a.duration)$('cur').textContent=fmt(this.value/1000*a.duration)};
+$('seek').onchange=function(){if(a.duration)a.currentTime=this.value/1000*a.duration;seeking=false};
+a.ontimeupdate=function(){if(seeking)return;$('cur').textContent=fmt(a.currentTime);if(a.duration)$('seek').value=a.currentTime/a.duration*1000};
+a.onloadedmetadata=function(){$('dur').textContent=fmt(a.duration)};
+a.onplay=function(){$('play').textContent='⏸';$('play').setAttribute('aria-label','Pause');$('disc').classList.add('spin')};
+a.onpause=function(){$('play').textContent='▶';$('play').setAttribute('aria-label','Lecture');$('disc').classList.remove('spin')};
+a.onended=function(){next(true)};
+a.onerror=function(){if(idx>=0&&tracks.length>1){setTitle('Format non pris en charge');setTimeout(function(){next(true)},900)}else if(idx>=0)setTitle('Format non pris en charge')};
+$('files').onchange=function(){add(this.files);this.value=''};
+var em=$('empty');
+['dragover','dragenter'].forEach(function(ev){document.addEventListener(ev,function(e){e.preventDefault();em.classList.add('drag')})});
+['dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(){em.classList.remove('drag')})});
+document.addEventListener('drop',function(e){e.preventDefault();if(e.dataTransfer&&e.dataTransfer.files)add(e.dataTransfer.files)});
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT'&&e.target.type!=='file')return;
+  if(e.code==='Space'){e.preventDefault();toggle()}
+  else if(e.code==='ArrowRight')a.currentTime+=5;else if(e.code==='ArrowLeft')a.currentTime-=5;
+});
+if('mediaSession' in navigator){
+  var ms=navigator.mediaSession;
+  try{ms.setActionHandler('play',toggle);ms.setActionHandler('pause',toggle);ms.setActionHandler('previoustrack',prev);ms.setActionHandler('nexttrack',function(){next(false)})}catch(e){}
+}
+render();
+})();
+</script>
+</body>
+</html>
